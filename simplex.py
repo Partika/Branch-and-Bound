@@ -26,7 +26,7 @@ def Determinante(m: list) -> float:
 def Inversa(matrizA: list, independentes: list) -> float:
     # determinante !=0?
     if(Determinante(matrizA) == 0):
-        return False
+        return False, independentes
 
     n = len(matrizA)
 

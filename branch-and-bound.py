@@ -31,59 +31,141 @@ class No:
         self.variaveis = None
 
     def resolve(self, funcaoZ: list, funcaoInicial: list) -> bool:
+        print(self.funcoes)
         resultados = sp.Simplex(funcaoZ, self.funcoes)
         if(not(isinstance(resultados, bool))):
             self.xOtimos = resultados[0]
             self.variaveis = resultados[1]
             self.solucaoOtima = sp.Valor_funcao(
                 funcaoInicial, self.xOtimos, self.variaveis)
-            return True
+            if(ta_certo_mesmo(self.xOtimos, self.funcoes, self.variaveis, len(funcaoInicial))):
+                return True
+            else: return False
         else:
             return False
 
 
-def todosInteiros(xFactiveis: list, variaveis: list, tamanho: int):
+def todos_inteiros(xFactiveis: list, variaveis: list, tamanho: int) -> list:
     tam = len(xFactiveis)
     for i in range(tam):
-        if(not(isinstance(xFactiveis[i], int)) and (variaveis[i] < (tamanho-1))):
+        if(not(xFactiveis[i] == floor(xFactiveis[i])) and (variaveis[i] < (tamanho))):
             return [False, i]
     return [True]
+
+
+def ta_certo_mesmo(xAchados: list, funcoes: list, xBasicos: list, tam: int) -> bool:
+    taCerto = True
+    tam2 = len(funcoes)
+    tam3 = len(xBasicos)
+    for i in range(tam2):
+        igual = True
+        for j in range(tam3):
+            if(xAchados[j]<0):
+                taCerto=False
+                break
+            if(xBasicos[j] >= tam):
+                continue
+            if(funcoes[i][xBasicos[j]] == 1):
+                igual = True
+                for k in range(tam):
+                    if(j == k):
+                        continue
+                    if(funcoes[i][k] != 0):
+                        igual = False
+                        break
+                if(not(igual)):
+                    break
+                if(funcoes[i][-2] == "<="):
+                    if(xAchados[j] > funcoes[-1]):
+                        taCerto = False
+                elif(funcoes[i][-2] == ">="):
+                    if(xAchados[j] < funcoes[-1]):
+                        taCerto = False
+                else:
+                    if(xAchados[j] != funcoes[-1]):
+                        taCerto = False
+                break
+        if(not(taCerto)):
+            continue
+    if(taCerto):
+        return True
+    else:
+        return False
+
+
+def nova_restricao(restricoes: list, novaRestricao: list, nivel: int, arvore: list) -> None:
+    tam1 = len(restricoes)
+    tam2 = len(novaRestricao)-2
+    mesma = True
+    for i in range(tam1):
+        for j in range(tam2):
+            if(restricoes[i][j] != novaRestricao[j]):
+                mesma = False
+                break
+    if(mesma):
+        if(novaRestricao[-2] == restricoes[i][-2]):
+            novas = deepcopy(restricoes)
+            novas[i][-1] = novaRestricao[-1]
+            arvore.append(No(novas, nivel))
+            return
+        else:
+            return
+    novas = deepcopy(restricoes)
+    novas.append(novaRestricao)
+    arvore.append(No(novas, nivel))
 
 
 def main():
     funcaoZ, funcoes, minMax = sp.Leitura()
     inicial = No(funcoes, 0)
     funcaoInicial = deepcopy(funcaoZ)
+    melhorZ = MAXINT
     tam = len(funcaoZ)
     if(minMax == 'max'):
+        melhorZ *= -1
         for i in range(tam):
             funcaoZ[i] *= -1
     solucaoOtima = []
     basicas = []
     lista = [inicial]
-    melhorZ = -MAXINT
     no = 0
     nivelMax = 20
     while(lista != [] and no < nivelMax):
         u = lista.pop(0)
         no += 1
         print('no: ', no, 'z = ', melhorZ)
+        print(u.funcoes)
+
+        # verifica se o no atual eh factivel
         factivel = u.resolve(deepcopy(funcaoZ), funcaoInicial)
         if(not(factivel)):
             print('nao factivel')
             continue
-        inteiro = todosInteiros(u.xOtimos, u.variaveis, tam)
+
+        # encontrando a variavel nao inteira
+        inteiro = todos_inteiros(u.xOtimos, u.variaveis, tam)
         bound = 0
         print(inteiro, u.xOtimos)
+
+        # criando os galhos
         if(inteiro[0]):
             print('resposta inteira encontrada')
-            if(u.solucaoOtima > melhorZ):
-                solucaoOtima = u.xOtimos
-                basicas = u.variaveis
-                melhorZ = u.solucaoOtima
+            if(minMax == "max"):
+                if(u.solucaoOtima > melhorZ):
+                    solucaoOtima = u.xOtimos
+                    basicas = u.variaveis
+                    melhorZ = u.solucaoOtima
+            else:
+                if(u.solucaoOtima < melhorZ):
+                    solucaoOtima = u.xOtimos
+                    basicas = u.variaveis
+                    melhorZ = u.solucaoOtima
+            continue
         else:
             print('resposta nao interia encontrada')
             bound = inteiro[1]
+
+        # pegando o arredondamento
         bound1 = floor(u.xOtimos[bound])
         bound2 = bound1+1
         variavel = u.variaveis[bound]
@@ -93,19 +175,20 @@ def main():
                 restricaoBase.append(1.0)
             else:
                 restricaoBase.append(0.0)
+
+        # as novas restricoes
         restricao1 = deepcopy(restricaoBase)
         restricao1.append('<=')
         restricao1.append(bound1)
         restricao2 = restricaoBase
-        restricao2.append('<=')
+        restricao2.append('>=')
         restricao2.append(bound2)
-        novaRestricao = deepcopy(u.funcoes)
-        novaRestricao.append(restricao1)
-        lista.append(No(novaRestricao, u.nivel+1))
-        novaRestricao = deepcopy(u.funcoes)
-        novaRestricao.append(restricao2)
-        lista.append(No(novaRestricao, u.nivel+1))
 
+        # valida a nova restricao
+        nova_restricao(u.funcoes, restricao1, u.nivel+1, lista)
+        nova_restricao(u.funcoes, restricao2, u.nivel+1, lista)
+
+    tam = len(basicas)
     for i in range(tam):
         print(f'x{basicas[i]} = {solucaoOtima[i]}')
     print('z = ', sp.Valor_funcao(funcaoInicial, solucaoOtima, basicas))

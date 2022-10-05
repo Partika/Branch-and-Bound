@@ -26,7 +26,7 @@ def Determinante(m: list) -> float:
 def Inversa(matrizA: list, independentes: list) -> float:
     # determinante !=0?
     if(Determinante(matrizA) == 0):
-        return False
+        return False, independentes
 
     n = len(matrizA)
 
@@ -87,10 +87,6 @@ def Inversa(matrizA: list, independentes: list) -> float:
     return inv, independentes
 
 
-def Inversa_(matriz: list, independentes: list) -> float:
-    return np.linalg.inv(matriz)
-
-
 def Cria_submatriz(matrizA: list, vetorX: list) -> float:
     submatriz = []
     for j in range(len(matrizA)):
@@ -116,7 +112,8 @@ def Cria_submatriz(matrizA: list, vetorX: list) -> float:
 def Separacao_da_matriz(funcaoZ: list, funcoes: list) -> list:
     # definicao da existencia de variaveis de folga
     inequacoes = []
-    for i in range(len(funcoes)):
+    tam = len(funcoes)
+    for i in range(tam):
         condicao = funcoes[i][-2]
         if condicao != '=':
             funcaoZ.append(0.0)
@@ -130,9 +127,10 @@ def Separacao_da_matriz(funcaoZ: list, funcoes: list) -> list:
 
     # inicio do aumento da matriz A
     matrizA = []
-    for i in range(len(funcoes)):
+    for i in range(tam):
         linha = funcoes[i][:-2]
-        for j in range(len(inequacoes)):
+        tam2 = len(inequacoes)
+        for j in range(tam2):
             if(i == j):
                 linha.append(inequacoes[j])
             else:
@@ -143,10 +141,10 @@ def Separacao_da_matriz(funcaoZ: list, funcoes: list) -> list:
     # inicio da definicao basicas e nao basicas
     basicas = []
     naoBasicas = []
-    maxBasicas = len(funcoes)
-    tam = len(funcaoZ)
-    for i in range(tam-1, -1, -1):
-        if(i < maxBasicas-1):
+    tam2 = len(funcaoZ)
+    tam3 = tam2-tam
+    for i in range(tam2):
+        if(i < tam3):
             naoBasicas.append(i)
         else:
             basicas.append(i)
@@ -156,12 +154,11 @@ def Separacao_da_matriz(funcaoZ: list, funcoes: list) -> list:
 
     # inicio da criacao da matriz de termos independentes
     independentes = []
-    for i in range(len(funcoes)):
+    for i in range(tam):
         independentes.append(funcoes[i][-1])
     # fim da criacao da matriz de termos independentes
 
     return matrizA, basicas, naoBasicas, independentes
-
 
 #   2. Fa¸ca itera¸c˜ao ← 1.
 
@@ -298,8 +295,11 @@ def Troca_k_l(basicas: list, naoBasicas: list, k: int, l: int) -> list:
 
 def Valor_funcao(funcaoZ: list, xRelativoBasico: list, basicas: list) -> float:
     resultado = 0
-    for i in range(len(xRelativoBasico)):
-        resultado += funcaoZ[basicas[i]]*xRelativoBasico[i]
+    tam = len(xRelativoBasico)
+    tam2 = len(funcaoZ)
+    for i in range(tam):
+        if(basicas[i] < tam2):
+            resultado += funcaoZ[basicas[i]]*xRelativoBasico[i]
     return resultado
 
 
@@ -325,28 +325,22 @@ def Leitura():
     return funcaoZ, funcoes, minMax
 
 
-def Simplex(funcaoZ, funcoes, minMax):
+def Simplex(funcaoZ, funcoes):
     matrizA, basicas, naoBasicas, independentes = Separacao_da_matriz(
         funcaoZ, funcoes)
     indFixo = deepcopy(independentes)
-    funcaoFin = deepcopy(funcaoZ)
-    tam = len(funcaoZ)
-    if(minMax == 'max'):
-        for i in range(tam):
-            funcaoZ[i] *= -1
     it = 1
     maxit = 10
     solucaoOtima = []
     deu = True
     while(it < maxit):
-        print()
         independentes = indFixo
         print('it: ', it)
         matrizBasica = Cria_submatriz(matrizA, basicas)
         matrizNaoBasica = Cria_submatriz(matrizA, naoBasicas)
         matrizBasicaInversa, independentes = Inversa(
             matrizBasica, independentes)
-        if(not(matrizBasicaInversa)):
+        if(matrizBasicaInversa == False):
             deu = False
             break
 
@@ -371,6 +365,10 @@ def Simplex(funcaoZ, funcoes, minMax):
         y = Direcao_simplex(matrizBasicaInversa, matrizA, k, naoBasicas)
 
         l = Calcula_l(y, xRelativo)
+        if(isinstance(l, bool) and l == False):
+            deu = False
+            print('l')
+            break
 
         basicas, naoBasicas = Troca_k_l(basicas, naoBasicas, k, l)
 
@@ -379,8 +377,10 @@ def Simplex(funcaoZ, funcoes, minMax):
 
     if(deu):
         print("A solucao factivel otima eh:")
-        for i in range(len(solucaoOtima)):
-            print(f'x{basicas[i]} = {solucaoOtima[i]}, ', end=' ')
-        print(f'z = {Valor_funcao(funcaoFin, solucaoOtima, basicas)}')
+        tam = len(solucaoOtima)
+        for i in range(tam):
+            print(f'x{basicas[i]+1} = {solucaoOtima[i]}', end=', ')
+        return solucaoOtima, basicas
     else:
-        print('Em algum momento nao deu para fazer a inversa porque o determinante deu 0')
+        print('Em algum momento nao deu para fazer a inversa porque o determinante deu 0 \n ou a direcao simplex deu <= 0')
+        return False
